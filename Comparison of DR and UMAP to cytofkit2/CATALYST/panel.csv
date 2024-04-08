@@ -1,0 +1,25 @@
+fcs_colname,antigen,marker_class
+CD45RB FITC_logicle_aligned,CD45RB,type
+CD79b RB545_logicle_aligned,CD79b,state
+IgA PerCP-Vio700_logicle_aligned,IgA,type
+CD71 RB780_logicle_aligned,CD71,state
+IgG2+IgG3 AF647_logicle_aligned,IgG2+IgG3,type
+IgM R718_logicle_aligned,IgM,type
+CD38 APC-H7_logicle_aligned,CD38,type
+CXCR5 BUV395_logicle_aligned,CXCR5,type
+HLA-DR BUV496_logicle_aligned,HLA-DR,state
+CD24 BUV563_logicle_aligned,CD24,type
+EBNA-1 BUV737_logicle_aligned,EBNA-1 BUV737,state
+CD19 BUV805_logicle_aligned,CD19,type
+EBNA-1 BV421_logicle_aligned,EBNA-1 BV421,state
+CD21 BV480_logicle_aligned,CD21,type
+CD20 BV570_logicle_aligned,CD20,type
+BAFF-R BV605_logicle_aligned,BAFF-R,state
+CD11c BV650_logicle_aligned,CD11c,type
+IgG BV711_logicle_aligned,IgG,type
+CD27 BV786_logicle_aligned,CD27,type
+IgG1+IgG3 PE_logicle_aligned,IgG1_IgG3,type
+CD86 PE-CF594_logicle_aligned,CD86,state
+CD10 PE-Cy5_logicle_aligned,CD10,type
+IgD cFluor BYG710_logicle_aligned,IgD,type
+CXCR3 PE-Cy7_logicle_aligned,CXCR3,type
