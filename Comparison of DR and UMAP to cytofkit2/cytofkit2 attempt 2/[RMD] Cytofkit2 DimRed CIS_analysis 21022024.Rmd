@@ -1,0 +1,140 @@
+---
+title: "Cytofkit2 - Dimension Reduction & Clustering (manual)"
+author: "Jordana Sheahan, adapted from Christian Tjiam"
+date: "21/02/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+## Intro
+This workflow uses Cytofkit2 to transform, concatenate, cluster and dimension-reduce cytometry data for high-dimensional analyses. A graphical user interface option is supplied for users of Cytofkit2, however, there is no way to document hyperparameters utilised for each run via GUI making reproducibility problematic. Multiple bugs also affect the GUI; concatenation of >20 samples often fails, and data is exported to a temp file (regardless of indicating output directory) that is difficult to locate and often susceptible to being permanently misplaced. By running the commands of Cytofkit2 with the code, we can document and more finely control each of these processes.
+
+## Read in data
+```{r, eval = FALSE}
+library(cytofkit2)
+library(job)
+library(data.table)
+#Set directory and import logicle-transformed and batch aligned csv file (from cytonorm/spectre)
+setwd("W:/Collaborative Projects/BSNRF/Spectre/Comparison of DR and UMAP to cytofkit2/cytofkit2 attempt 2")
+getwd()
+
+combined.data.transformed <- fread("aligned.cell.edited.csv")
+
+```
+
+## Concatenate data
+UMAP and t-SNE are both inherently non-deterministic algorithms, and so direct comparisons can only be made within one data set. To do this, we have to concatenate (combine with ability to separate) data from samples of interest. In this step, we will also logicle transform each parameter in the flow data.
+
+
+```{r, eval=FALSE}
+#Data merge and transform
+#library("cytofkit2")
+
+#combined_data_transformed <- cytof_exprsMerge(fcsFiles = file, comp=FALSE,
+                                              #transformMethod = "autoLgcl",
+                                             # mergeMethod = "ceil",
+                                             # fixedNum = 10000
+                                             # )
+
+
+#dim(combined_data_transformed)
+#colnames(combined_data_transformed)
+#combined_data_transformed <- combined_data_transformed[,-c(13, 15)]
+```
+
+## Cluster analysis 
+First, we will cluster the data to identify populations that partition together as similar cells in high-dimensional space. Initially, we identify parameters - used for both clustering analysis and for the dimensionality reduction. We will use PhenoGraph and flowSOM to for cluster analysis and save these in their respective objects. 
+##DECREASED RPhenograph_k from 60 to 30 as may have been too high for this number of samples 
+```{r, eval=FALSE}
+
+#Identify compensated data for analysis
+data_transformed <- combined.data.transformed[,c(1:27)]
+colnames(data_transformed)
+
+#File is too big - remove HC101E which has extremely large number of rows
+#data_transformed <- data_transformed[data_transformed$FileName != "HC101E", ]
+
+#Ensure internal control samples all removed from dataset
+#data_transformed <- data_transformed[!grepl("IC5", data_transformed$FileName), ]
+
+
+
+#Run cell subset identification
+clust.params <- data_transformed[,c(4, 6:11, 13, 15, 17:27)]
+colnames(clust.params)
+dim(clust.params)
+
+#Memory saving steps:
+#Remove unused objects
+rm(combined.data.transformed)
+
+#Run function as background job to free up environment
+job::job({cluster_PhenoGraph <- cytof_cluster(xdata = clust.params, 
+                                    method = "Rphenograph",
+                                    Rphenograph_k = 30)})
+
+#Add in by Jordana - savepoint
+write.csv(clust.params, file = "cytofkit_clust.params.csv")
+
+```
+
+
+## Dimensionality reduction ~ 
+To visualise cell subsets defined by PhenoGraph or flowSOM, we will embed the high dimensional data in two dimensional space, using uniform manifold approximation and projection embedding (UMAP).
+##DECREASED UMAP NEIGHBOUR FROM 30 to 20 and min dist to 0.1 to minimize distance between cluster neighbours
+```{r, eval=FALSE}
+
+  #Run dim reduction
+umap.params <- data_transformed[,c(4, 6:11, 13, 15, 17:27)]
+
+job::job({data_transformed_umap <- cytof_dimReduction(data = umap.params,
+                                            markers = colnames(umap.params),
+                                            method = "umap",
+                                            umap_neighbour = 30,
+                                            umap_min_dist = 0.1)
+})
+  
+
+
+```
+
+## Append and export data as csv
+FlowSOM, PhenoGraph and UMAP have calculated and assigned a discrete variable for each cell (row). We now append these data to the logicle-transformed data using column bind.
+
+```{r, eval=FALSE}
+#Append clustering and dim reduction data to fluorescence data
+data_all <- cbind(data_transformed, data_transformed_umap, 
+                     PhenoGraph = cluster_PhenoGraph)
+#Export as csv file
+data_all <- as.data.frame(data_all)
+write.csv(data_all, file = "cytofkit_EBNA1_analysis.csv")
+```
+
+## Calculate mean logicle-transformed fluorescence intensities for each subset
+For visual analysis of each flowSOM or PhenoGraph cluster, we use the code below to calculate the logicle-transformed, mean fluorescence intensities for each flowSOM metacluster or PhenoGraph cluster.
+
+```{r, eval=FALSE}
+#Export mean expression data for each cluster
+
+mean.expression.PhenoGraph <- cytof_clusterStat(data_all, cluster = "PhenoGraph", statMethod = "mean")
+write.csv(mean.expression.PhenoGraph, file = "cytofkit_meanexpression_analysis.csv")
+```
+
+## Append and write to .fcs
+Finally we append the UMAP, PhenoGraph and flowSOM data to the original dataset and save this in fcs file format using cytof_addToFCS function.
+
+```{r, eval=FALSE}
+#Append clustering and dim reduction data to fluorescence data
+#cytof_addToFCS(data_all, rawFCSdir=dir, analyzedFCSdir=dir, 
+               #transformed_cols = c("umap_1", "umap_2"), 
+               #cluster_cols = c("PhenoGraph"))
+```
+
+## Save R data
+```{r, eval=FALSE}
+save.image(file = "CIS_analysis.RData")
+# load("CIS_analysis.RData")
+```

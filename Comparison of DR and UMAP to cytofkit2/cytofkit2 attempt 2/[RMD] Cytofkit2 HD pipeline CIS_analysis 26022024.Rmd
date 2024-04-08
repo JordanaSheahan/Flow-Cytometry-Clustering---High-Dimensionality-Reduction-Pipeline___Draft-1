@@ -1,0 +1,427 @@
+---
+title: '[RMD] Flow HD pipeline'
+author: "Christian Tjiam"
+date: "14/03/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Merge Cytofkit outputs
+
+```{r}
+setwd("W:/Collaborative Projects/BSNRF/Spectre/Comparison of DR and UMAP to cytofkit2/cytofkit2 attempt 2")
+
+#read in logicle transformed expression data
+allexpression.data <- read.csv(file = "cytofkit_EBNA1_analysis.csv", quote = "")
+
+#get relevant (compensated) expression data
+expression.data <- allexpression.data[]
+colnames(expression.data)
+
+#clean up column names
+colnames(expression.data) <- c("Number", "Event", "Group", "Batch", "CD45RB", "CD79b", "IgA",
+                               "CD71", "IgG2 + IgG3", "IgM", "CD38",
+                               "CXCR5", "HLA-DR", "CD24", "EBNA-1 BUV737", "CD19", "EBNA-1 BV421",
+                               "CD21", "CD20", "BAFF-R", "CD11c",
+                               "IgG", "CD27", "IgG1 + IgG3", "CD86",
+                               "CD10", "IgD", "CXCR3",
+                               "umap_1", "umap_2", "PhenoCluster"
+                               )
+colnames(expression.data)
+rm(allexpression.data)
+
+
+# Specify the desired column order
+desired_order <- c("Number", "Event", "Group", "Batch", "CD19", "CD20", "CD21", "CD24", "CD38", 
+                   "CD27", "IgD",  "CD10", "CD45RB", "CD79b", "IgA",
+                   "CD71",   "IgG",  "IgG1 + IgG3", "IgG2 + IgG3", 
+                   "IgM", "CD11c", "CXCR3",  "CXCR5",  "CD86",
+                   "BAFF-R", "HLA-DR", "EBNA-1 BUV737","EBNA-1 BV421",
+                   "umap_1", "umap_2", "PhenoCluster"
+)
+
+# Rearrange the columns based on the desired order
+expression.data <- expression.data[, desired_order]
+
+# Check the new column order
+colnames(expression.data)
+
+#Write csv to check
+write.csv(expression.data, file = "cytofkit_expression_rearrangedcol.data.csv")
+
+
+```
+
+## Visualisation of the Dimension Reduced data
+
+```{r pressure, echo=FALSE}
+library(ggplot2)
+library(ggsci)
+library(viridis)
+
+#create colour palette for discrete variables (phenoclusters)
+  My_pal <-  c(
+  "dodgerblue2", "#E31A1C", # red
+  "green4",
+  "#6A3D9A", # purple
+  "#FF7F00", # orange
+  "black", "gold1",
+  "skyblue2", "#FB9A99", # lt pink
+  "palegreen2",
+  "#CAB2D6", # lt purple
+  "#FDBF6F", # lt orange
+  "gray70", "khaki2",
+  "maroon", "orchid1", "deeppink1", "blue1", "steelblue4",
+  "darkturquoise", "green1", "yellow4", "yellow3",
+  "darkorange4", "brown", "#25C98C" #teal
+)
+
+#visualise concatenated data
+p1 <- ggplot(expression.data, aes(x = umap_1,
+                                y = umap_2,
+                                colour = factor(PhenoCluster))) + 
+                                geom_point(size = 0.05, show.legend = TRUE) +
+                                theme_light() +
+                                scale_colour_manual("PhenoCluster", values = My_pal) +
+                                guides(colour = guide_legend(override.aes = list(size = 5), ncol = 2)) + 
+                                xlab("UMAP 1") + ylab("UMAP 2")
+
+p1
+
+#Export data for analysis
+jpeg(filename = "Interim_panel_PhenoCluster_altcolourpal.jpg", width = 8, height = 7, units = 'in', res = 600)
+p1
+dev.off()
+```
+## Multiplots
+```{r}
+library(cowplot)
+library(viridis)
+
+# Create a vector of characters for each marker/parameter that
+parameter.types <- colnames(expression.data[, c(5:28
+                                                )])
+
+# Create function that will construct a t-SNE scatter plot that displays parameter expression in the colour mapping
+multiplots <- function(i) {
+                          colour <- expression.data[[i]]
+                          ggplot(expression.data, aes(x = umap_1, y = umap_2)) +
+                          ggtitle(colnames(expression.data[i],
+                                           )) +
+                          geom_point(size = 0.1,
+                          aes(colour = colour),
+                              show.legend = FALSE) +
+                          theme_classic() +
+                          theme(plot.title = element_text(size = 24, face = "bold")) +
+                          scale_colour_gradientn(
+                                                 "MFI",
+                                                 colours = c("black", inferno(4)),
+                                                 limits = c(-1, 5),
+                                                 breaks = c(seq(
+                                                                from = 1, to = 5, by = 1
+                                                 ))
+                                                 ) +
+                          ylim(c(-10, 15)) + xlim(c(-10, 15)) + xlab("UMAP 1") + ylab("UMAP 2")
+                          }
+
+# Iterate function through each element of the character vector
+markerexpression <- lapply(parameter.types, multiplots)
+
+# Create multiplots with cowplot, calling on list of ggplot objects created through lapply()
+plotmarkerexpression <- plot_grid(plotlist = markerexpression,
+                                  ncol = 8,
+                                  align = "hv")
+# 
+# export hi res jpeg
+jpeg("Expression data - Multiplots- scale adjusted 0 to 4.jpg", width = 40, height = 15, units = 'in', res = 300)
+plotmarkerexpression
+dev.off()
+```
+## Cluster Annotations
+```{R, fig.width=8, fig.align="center", message=FALSE}
+
+library(dplyr)
+library(stringr)
+library(viridis)
+library(ggsci)
+library(ggplot2)
+library(MetBrewer)
+
+# create new data table 
+annotate.data1 <- expression.data %>% mutate(prefix_tag = sub("^", "Pheno_", expression.data$PhenoCluster))
+
+annotate.data2 <- annotate.data1 %>% mutate(suffix_tag = sub("$", "_clust", annotate.data1$prefix_tag)) %>% 
+                  mutate(Cell_ID = str_replace_all(suffix_tag,c("Pheno_1_clust" = "Mature Naive",
+                                                                 "Pheno_2_clust" = "Mature Naive",
+                                                                 "Pheno_3_clust"= "CD24lo Naive",
+                                                                 "Pheno_4_clust" = "MZP",
+                                                                 "Pheno_5_clust" = "IgA+ swMBC",
+                                                                 "Pheno_6_clust" = "IgG3+ CD11c+/- MZ",
+                                                                 "Pheno_7_clust"= "CXCR3+ Naive",
+                                                                 "Pheno_8_clust" = "Possible plasma cells",
+                                                                 "Pheno_9_clust" = "CD79blo T2",
+                                                                 "Pheno_10_clust" = "IgG1+ swMBC",
+                                                                 "Pheno_11_clust" = "T2",
+                                                                 "Pheno_12_clust"= "IgM-only MBC",
+                                                                 "Pheno_13_clust" = "IgG2+ swMBC",
+                                                                "Pheno_14_clust" = "CXCR3+ MZB",
+                                                                "Pheno_15_clust" = "Unsw/MZB",
+                                                                "Pheno_16_clust" = "Atypical CD11c+CD21lo MBC",
+                                                                "Pheno_17_clust" = "IgM+ Plasmablasts",
+                                                                "Pheno_18_clust" = "CXCR3+ IgG1 swMBC",
+                                                                "Pheno_19_clust" = "T1",
+                                                                "Pheno_20_clust" = "CD11c+ Naive",
+                                                                "Pheno_21_clust" = "CD71+CXCR3+ Naive",
+                                                                "Pheno_22_clust" = "IgM- Plasmablasts",
+                                                                "Pheno_23_clust" = "CD10+IgG3+ MBC",
+                                                                "Pheno_24_clust" = "CD10+IgA+ swMBC",
+                                                                "Pheno_25_clust" = "CD86hi IgG1 swMBC",
+                                                                "Pheno_26_clust" = "CXCR3+ MZB/IgD+ MBC"
+                                                                )))
+
+#Visualise the annotated concatenated data
+ My_pal <- c(pal_igv()(26))
+names(My_pal) = factor(unique(annotate.data2$Cell_ID))
+
+p2 <- ggplot(annotate.data2, 
+             aes(x = umap_1,
+                 y = umap_2,
+                 colour = Cell_ID)) +
+      geom_point(size = 0.1, show.legend = TRUE) +
+      theme_classic() + xlab("UMAP 1") + ylab("UMAP 2") +
+      scale_colour_manual("Cell_ID", values = c(My_pal)) +
+      guides(colour = guide_legend(override.aes = list(size = 5), ncol = 1))
+
+p2
+
+jpeg("Annotated clusters.jpg", width = 11, height = 8, units = 'in', res = 300)
+p2
+dev.off()
+
+write.csv(annotate.data3, file = "annotated.data.cytofkit2.csv", row.names = FALSE)
+
+```
+
+## Subset
+```{r}
+library(dplyr)
+library(cowplot)
+
+samplenames <- c("MS", "HC", "IC")
+
+my_pal <- c(
+  "dodgerblue2", "#E31A1C", # red
+  "green4",
+  "#6A3D9A", # purple
+  "#FF7F00", # orange
+  "black", "gold1",
+  "skyblue2", "#FB9A99", # lt pink
+  "palegreen2",
+  "#CAB2D6", # lt purple
+  "#FDBF6F", # lt orange
+  "gray70", "khaki2",
+  "maroon", "orchid1", "deeppink1", "blue1", "steelblue4",
+  "darkturquoise", "green1", "yellow4", "yellow3",
+  "darkorange4", "brown", "#25C98C" #teal
+)
+
+# Create a list to store subsets of data for each group
+samplelist <- list()
+for (i in unique(samplenames)) {
+  samplelist[[i]] <- annotate.data2 %>% filter(grepl(i, Event))
+}
+
+# Define function to create plots for each group
+subsetplots <- function(i) {
+  ggplot(samplelist[[i]], aes(
+    x = umap_1,
+    y = umap_2,
+    colour = factor(Cell_ID)
+  )) +
+    ggtitle(i) +  # Add title based on group name
+    geom_point(size = 0.1, show.legend = TRUE) +
+    theme_classic() + xlab("UMAP 1") + ylab("UMAP 2") +
+    theme(legend.text = element_text(size = 12),
+          legend.position = "none") +
+    scale_colour_manual("Cell ID", values = my_pal) +
+    guides(colour = guide_legend(override.aes = list(size = 5), ncol = 2))
+}
+
+# Create plots for each group
+multiplot <- lapply(samplenames, subsetplots)
+
+# Arrange plots in a grid
+p3 <- plot_grid(plotlist = multiplot,
+                ncol = 2,
+                align = "hv",
+                labels = "",
+                label_size = 14
+)
+
+# Save the plot to a JPEG file
+jpeg("EBNA1 CIS and HC subsetted.jpg", width = 15, height = 7.5, units = 'in', res = 300)
+p3
+dev.off()
+
+
+
+
+#########Subset by batch (manual) IC samples ONLY
+
+library(dplyr)
+library(cowplot)
+
+
+library(ggplot2)
+library(gridExtra)
+
+##First filter by internal control samples only:
+
+# Make a copy of annotate.data2
+annotate.data3 <- annotate.data2
+
+# Remove double quotes from Group column in the copied dataframe
+annotate.data3$Group <- gsub("\"", "", annotate.data3$Group)
+
+# Trim whitespace from Group column
+annotate.data3$Group <- trimws(annotate.data3$Group)
+
+# Filter rows where Group is "IC"
+IC_subset <- annotate.data3 %>%
+  filter(Group == "IC")
+
+# Printing the subset
+print(IC_subset)
+
+batchnames <- c("A", "B", "C", "D", "E", "F", "G", "H", "I")
+
+#create colour palette for discrete variables (phenoclusters)
+  My_pal <-  c(
+   "dodgerblue2", 
+   "#E31A1C", # red
+   "green4",
+   "#6A3D9A", # purple
+   "#FF7F00", # orange
+   "black", 
+   "gold1",
+   "skyblue2", 
+   "#FB9A99", # lt pink
+   "palegreen2",
+   "#CAB2D6", # lt purple
+   "#FDBF6F", # lt orange
+   "gray70", 
+   "khaki2",
+   "maroon", 
+   "orchid1", 
+   "deeppink1", 
+   "blue1", 
+   "steelblue4",
+   "darkturquoise", 
+   "green1", 
+   "yellow4", 
+   "yellow3",
+   "darkorange4", 
+   "brown", 
+   "#25C98C" #teal
+)
+
+samplelist <- list()
+for (i in unique(batchnames)) {
+  samplelist[[i]] <- IC_subset %>% filter(grepl(i, Batch))
+}
+
+subsetplots <- function(i) {
+  ggplot(samplelist[[i]], aes(
+    x = umap_1,
+    y = umap_2,
+    colour = factor(Cell_ID)
+  )) +
+    geom_point(size = 0.5, show.legend = TRUE) +
+    theme_classic() + xlab("UMAP 1") + ylab("UMAP 2") +
+    theme(legend.text = element_text(size = 12),
+          legend.position = "none") +
+    scale_colour_manual("Cell ID", values = My_pal) +
+    guides(colour = guide_legend(override.aes = list(size = 5), ncol = 2)) +
+    ggtitle(paste("Batch", i))  # Add title based on batch name
+}
+
+multiplot <- lapply(sort(batchnames), subsetplots)  # Sort batchnames alphabetically
+p3 <- plot_grid(plotlist = multiplot,
+                ncol = 2,
+                align = "hv",
+                labels = "",
+                label_size = 14
+)
+
+jpeg("IC Batch subsetted.jpg", width = 25, height = 25, units = 'in', res = 300)
+print(p3)  # Print the plot to the jpeg file
+dev.off()
+
+
+
+
+
+
+
+
+```
+
+
+```{r}
+
+##Calculate frequencies and proportions of each cluster by MS and controls:
+# Filter the dataframe to include only MS and HC groups
+filtered_df <- subset(annotate.data3, Group %in% c("MS", "HC"))
+
+# Calculate frequencies of Cell_ID types within each group
+freq_table <- table(filtered_df$Group, filtered_df$Cell_ID)
+
+# Convert frequency table to dataframe
+freq_df <- as.data.frame.matrix(freq_table)
+
+# Calculate total counts for each group
+total_counts <- rowSums(freq_df)  # Sum by rows (group-wise)
+
+# Calculate frequency as a proportion of total counts for each group
+freq_proportions <- freq_df / total_counts
+
+# Bind frequencies and proportions together
+combined_df <- rbind(freq_df, freq_proportions)
+
+# Name the new rows
+rownames(combined_df)[nrow(combined_df) - 1] <- "HC Proportion"
+rownames(combined_df)[nrow(combined_df)] <- "MS Proportion"
+
+# Write combined dataframe to a CSV file
+write.csv(combined_df, file = "frequency_comparison.csv")
+
+# Confirm file creation
+cat("CSV file 'frequency_comparison.csv' has been created.")
+
+library(ggplot2)
+library(tidyr)
+
+# Assuming your dataframe is named 'frequency_comparison'
+# Melt the dataframe to long format
+# Remove the first two rows
+frequency_comparison <- frequency_comparison[-c(1, 2), ]
+
+frequency_comparison_long <- gather(frequency_comparison, key = "B_cell_type", value = "Value", -...1)
+
+# Plot grouped bar graph
+ggplot(frequency_comparison_long, aes(x = B_cell_type, y = Value, fill = ...1)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "B Cell Types Comparison",
+       x = "B Cell Type",
+       y = "Proportion",
+       fill = "Group") +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+```
+
