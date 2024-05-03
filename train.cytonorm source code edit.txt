@@ -1,0 +1,120 @@
+trace(Spectre::train.cytonorm, edit = T) #make sure all iterations of model$fsom actually replaced with model$fsom$FlowSOM
+
+function (model, align.cols, method = "cytonorm", cytonorm.goal = "mean", 
+  cytonorm.nQ = 101, quantile.min = 0.001, quantile.max = 0.009, 
+  dir = getwd(), mem.ctrl = TRUE) 
+{
+  if (!is.element("Spectre", installed.packages()[, 1])) 
+    stop("Spectre is required but not installed")
+  if (!is.element("data.table", installed.packages()[, 1])) 
+    stop("data.table is required but not installed")
+  if (!is.element("CytoNorm", installed.packages()[, 1])) 
+    stop("CytoNorm is required but not installed")
+  if (!is.element("flowCore", installed.packages()[, 1])) 
+    stop("flowCore is required but not installed")
+  if (!is.element("Biobase", installed.packages()[, 1])) 
+    stop("Biobase is required but not installed")
+  require(Spectre)
+  require(data.table)
+  require(CytoNorm)
+  require(Biobase)
+  message("Training alignment - setup")
+  model$fsom$FlowSOM$data
+  setwd(dir)
+  starting.dir <- getwd()
+  message("Working directory is '", starting.dir, "'")
+  if (method == "quantile") {
+    stop("Quantile not yet supported")
+  }
+  if (method == "cytonorm") {
+    outputDir = "./tmp"
+    normMethod.train = QuantileNorm.train
+    normParams = list(nQ = cytonorm.nQ, goal = cytonorm.goal)
+    transformList = NULL
+    clean = TRUE
+    plot = FALSE
+    verbose = TRUE
+    clusterRes <- list()
+    message("Training alignment - file (batch) preparation")
+    file.dat <- model$fsom$FlowSOM$data
+    file.dat <- as.data.table(file.dat)
+    train.files <- unique(file.dat$File)
+    train.files
+    model$files
+    model$file.nums
+    if (!all(model$file.nums == train.files)) {
+      setwd(starting.dir)
+      stop("Error -- file mismatch has occured")
+    }
+    message("Training alignment - file (batch) and metacluster splitting")
+    setwd(starting.dir)
+    dir.create("tmp-train/")
+    setwd("tmp-train/")
+    getwd()
+    for (file in train.files) {
+      message(" -- running File '", file, "'")
+      file.dt <- file.dat[file.dat[["File"]] == file, 
+        ]
+      metadata <- data.frame(name = dimnames(file.dt)[[2]], 
+        desc = dimnames(file.dt)[[2]])
+      metadata$range <- apply(apply(file.dt, 2, range), 
+        2, diff)
+      metadata$minRange <- apply(file.dt, 2, min)
+      metadata$maxRange <- apply(file.dt, 2, max)
+      file.ff <- new("flowFrame", exprs = as.matrix(file.dt), 
+        parameters = Biobase::AnnotatedDataFrame(metadata))
+      file.ff
+      fsom_file <- FlowSOM::NewData(model$fsom, file.ff)
+      fsom_file
+      cellClusterIDs <- model$fsom$FlowSOM$metaclustering[fsom_file$map$mapping[, 
+        1]]
+      for (cluster in unique(model$fsom$FlowSOM$metaclustering)) {
+        if (sum(FlowSOM::GetMetaclusters(fsom_file, 
+          model$fsom$FlowSOM$metaclustering) == cluster) > 
+          0) {
+          suppressWarnings(write.FCS(file.ff[cellClusterIDs == 
+            cluster, ], file = file.path(getwd(), paste0(gsub("[:/]", 
+            "_", file), "_fsom", cluster, ".fcs"))))
+        }
+      }
+    }
+    message("Training alignment - learning conversions")
+    clusterRes <- list()
+    for (cluster in unique(model$fsom$FlowSOM$metaclustering)) {
+      if (verbose) 
+        message("Processing cluster ", cluster)
+      normParams_tmp <- c(normParams, list(files = file.path(getwd(), 
+        paste0(gsub("[:/]", "_", train.files), "_fsom", 
+          cluster, ".fcs")), labels = as.character(model$files), 
+        channels = align.cols, transformList = NULL, 
+        verbose = verbose, plot = plot))
+      normParams_tmp <- normParams_tmp[unique(names(normParams_tmp))]
+      if (is.list(normParams[["goal"]])) {
+        normParams_tmp[["goal"]] <- normParams[["goal"]][[cluster]]
+      }
+      clusterRes[[cluster]] <- do.call(normMethod.train, 
+        normParams_tmp)
+    }
+    message("Training alignment - cleanup")
+    if (clean) {
+      for (cluster in unique(model$fsom$FlowSOM$metaclustering)) {
+        tmp_files <- file.path(getwd(), paste0(gsub("[:/]", 
+          "_", train.files), "_fsom", cluster, ".fcs"))
+        file.remove(tmp_files[file.exists(tmp_files)])
+      }
+      setwd(starting.dir)
+      unlink("tmp-train", recursive = TRUE)
+    }
+    model$align.cols <- align.cols
+    model$method <- method
+    model$conversions <- clusterRes
+    if (is.null(model$fsom) | is.null(model$method) | is.null(model$conversions)) {
+      stop("The 'conversions' have not been added correctly")
+    }
+    if (mem.ctrl == TRUE) {
+      gc()
+    }
+  }
+  message("Training alignment - training complete")
+  return(model)
+}
