@@ -7,6 +7,9 @@ Spectre: https://wiki.centenary.org.au/display/SPECTRE/Discovery+workflow+with+b
 Cytofkit2: https://github.com/JinmiaoChenLab/cytofkit2
 CytoNorm: https://github.com/saeyslab/CytoNorm
 
+Start with downloading the HTML Masterscript file to view full pipeline.
+
+
 This pipeline is designed to process flow cytometry data from raw fcs file format to visualisation and analysis steps by combining the best parts of the above packages.
 Broadly, the steps this pipeline takes is as follows:
 1. Pre-processing by fcs file re-labelling for easy R manipulation downstream and configuring as csv files with metadata setup
