@@ -3,29 +3,28 @@ title: "Clustering and High Dimensionality Masterscript 09/04/2024"
 output: html_notebook
 editor_options: 
   chunk_output_type: inline
+  markdown: 
+    wrap: 72
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
-
-```{r}
-plot(cars)
-```
-
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
-
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
-
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
-
-Notes prior to commencing project: 
-- It is recommended to review individual vignettes for packages Spectre, Cytofkit2 and CytoNorm.
-- Samples should be gated for cells, doublets, time, live, fluorophore aggregates and main target cell subset in FlowJo and then exported as CSV with scale values.
-- Initial data file import is in csv format into Spectre. Transfer from Spectre to Cytofkit2 involves conversion back into fcs file format. Metadata is required to be saved in a separate csv file. File naming for csv sample files should be in a format that includes sample type (case/control/reference control), sample identifier and batch reference number. To quickly rename files, use script provided below in pre-setup. See Spectre vignette for further information: https://wiki.centenary.org.au/display/SPECTRE/Discovery+workflow+with+batch+alignment+using+CytoNorm 
-- As processing can take some time with large data files, it is recommended to use data file save points throughout this script if you wish to return to script later. These are marked "#Checkpoint"
+Notes prior to commencing project: - It is recommended to review
+individual vignettes for packages Spectre, Cytofkit2 and CytoNorm. -
+Samples should be gated for cells, doublets, time, live, fluorophore
+aggregates and main target cell subset in FlowJo and then exported as
+CSV with scale values. - Initial data file import is in csv format into
+Spectre. Transfer from Spectre to Cytofkit2 involves conversion back
+into fcs file format. Metadata is required to be saved in a separate csv
+file. File naming for csv sample files should be in a format that
+includes sample type (case/control/reference control), sample identifier
+and batch reference number. To quickly rename files, use script provided
+below in pre-setup. See Spectre vignette for further information:
+<https://wiki.centenary.org.au/display/SPECTRE/Discovery+workflow+with+batch+alignment+using+CytoNorm> -
+As processing can take some time with large data files, it is
+recommended to use data file save points throughout this script if you
+wish to return to script later. These are marked "#Checkpoint"
 
 #Pre-Setup
+
 ```{r}
 # Pre-setup required if csv file names are not in an appropriate format for processing
 # Label mapping csv file required to change bulk file names
@@ -68,9 +67,9 @@ for (i in 1:nrow(mapping_data)) {
 
 ```
 
+#First Stage: Setup, Transformation and Batch Alignment using Spectre
+Package #1. Load Packages and Set Working Directory
 
-#First Stage: Setup, Transformation and Batch Alignment using Spectre Package
-#1. Load Packages and Set Working Directory
 ```{r}
 
 ### Install CytoNorm package
@@ -117,8 +116,8 @@ for (i in 1:nrow(mapping_data)) {
 
 ```
 
-
 #2. Data Import and File Merge
+
 ```{r}
 
 ### Import data
@@ -164,8 +163,8 @@ data.list[[1]]
     meta.dat
 ```
 
-
 #3. Logicle Data Transformation
+
 ```{r}
 
  #Reference directory
@@ -319,6 +318,7 @@ as.matrix(transf.cols)
 ```
 
 #### 4. Add metadata and set some preference
+
 ```{r}
 
 ### Add metadata to data.table
@@ -377,8 +377,8 @@ sub.targets
 
 ```
 
-
 #### 5. Batch alignment
+
 ```{r}
 
 #### Batch alignment using CytoNorm
@@ -512,12 +512,27 @@ fwrite(aligned.sub, 'aligned.sub.csv')
 
 ```
 
-
-
-###Important Note: From this point, the decision can be made regarding whether to continue using Spectre/FlowSOM or Cytofkit2/PhenoGraph for clustering, dimensional reduction and subsequent visualisation. Things to consider to assist with this decision: number of samples affects run time (Phenograph has high run time and RAM requirements compared to FlowSOM for high n), number of parameters (Phenograph is more suitable than FlowSOM for greater nuance and complexity in samples and hence may be more suitable for larger number of expression markers and/or for spectral flow cytometry data, but again run time needs to be considered for greater number of expression markers). For cluster number expected value of k<20, FlowSOM may be more suitable. For cluster number expected value k>20, PhenoGraph may be more suitable. In addition, for defining cell subsets from samples of general lymphocytes/monocytes/DCs, FlowSOM may be more efficient. However, for defining cell subsets within specific groups (e.g. B cell subsets), PhenoGraph may be more effective. If decided Cytofkit2/Phenograph to be applied, skip to line777 or 7.a chunk and continue using object cell.dat which will contain your aligned and transformed data. Otherwise continue below for FlowSom/Spectre.
-
+###Important Note: From this point, the decision can be made regarding
+whether to continue using Spectre/FlowSOM or Cytofkit2/PhenoGraph for
+clustering, dimensional reduction and subsequent visualisation. Things
+to consider to assist with this decision: number of samples affects run
+time (Phenograph has high run time and RAM requirements compared to
+FlowSOM for high n), number of parameters (Phenograph is more suitable
+than FlowSOM for greater nuance and complexity in samples and hence may
+be more suitable for larger number of expression markers and/or for
+spectral flow cytometry data, but again run time needs to be considered
+for greater number of expression markers). For cluster number expected
+value of k\<20, FlowSOM may be more suitable. For cluster number
+expected value k\>20, PhenoGraph may be more suitable. In addition, for
+defining cell subsets from samples of general lymphocytes/monocytes/DCs,
+FlowSOM may be more efficient. However, for defining cell subsets within
+specific groups (e.g. B cell subsets), PhenoGraph may be more effective.
+If decided Cytofkit2/Phenograph to be applied, skip to line777 or 7.a
+chunk and continue using object cell.dat which will contain your aligned
+and transformed data. Otherwise continue below for FlowSom/Spectre.
 
 #### 6.a. Spectre Clustering and dimensionality reduction using FlowSOM
+
 ```{r}
 
 setwd(OutputDirectory)
@@ -566,6 +581,7 @@ setwd("Output 3 - clustering")
 ```
 
 ###6.b. Spectre Clusters: Annotate Clusters
+
 ```{r}
 #Annotate Clusters
 cell.dat <- fread("clustered.data_edited.csv")
@@ -667,6 +683,7 @@ make.multi.plot(cell.sub, "UMAP_X", "UMAP_Y", "Population", batch.col, col.type 
 ```
 
 ###7.c. Spectre Summary data, graphs, statistics
+
 ```{r}
 
 setwd(OutputDirectory)
@@ -772,8 +789,8 @@ plot.cols
 
 ```
 
-
 ###7.a. Cytofkit2/PhenoGraph setup script
+
 ```{r}
 #Load Packages
 library(cytofkit2)
@@ -790,9 +807,13 @@ combined.data.transformed <- fread("aligned.cell.edited.csv")
 #combined.data.transformed <- cell.dat
 ```
 
+###7.b. Phenograph Cluster analysis - WARNING - Run time can be high for
+large datasets First, we will cluster the data to identify populations
+that partition together as similar cells in high-dimensional space.
+Initially, we identify parameters - used for both clustering analysis
+and for the dimensionality reduction. We will use PhenoGraph AND
+flowSOMfor cluster analysis and save these in their respective objects.
 
-###7.b. Phenograph Cluster analysis - WARNING - Run time can be high for large datasets
-First, we will cluster the data to identify populations that partition together as similar cells in high-dimensional space. Initially, we identify parameters - used for both clustering analysis and for the dimensionality reduction. We will use PhenoGraph AND flowSOMfor cluster analysis and save these in their respective objects. 
 ```{r}
 #Identify aligned and transformed data for analysis
 data_transformed <- combined.data.transformed[,c(1:27)]
@@ -825,9 +846,11 @@ write.csv(clust.params, file = "cytofkit_clust.params.csv")
 
 ```
 
+###7.c. Dimensionality reduction \~ WARNING - This step may also have
+long run time! To visualise cell subsets defined by PhenoGraph, we will
+embed the high dimensional data in two dimensional space, using uniform
+manifold approximation and projection embedding (UMAP).
 
-###7.c. Dimensionality reduction ~ WARNING - This step may also have long run time!
-To visualise cell subsets defined by PhenoGraph, we will embed the high dimensional data in two dimensional space, using uniform manifold approximation and projection embedding (UMAP).
 ```{r, eval=FALSE}
 
 #Run dim reduction as background job
@@ -844,8 +867,10 @@ job::job({data_transformed_umap <- cytof_dimReduction(data = umap.params,
 
 ```
 
-###7.d. Append and export Phenograph data as csv
-FlowSOM, PhenoGraph and UMAP have calculated and assigned a discrete variable for each cell (row). We now append these data to the logicle-transformed data using column bind.
+###7.d. Append and export Phenograph data as csv FlowSOM, PhenoGraph and
+UMAP have calculated and assigned a discrete variable for each cell
+(row). We now append these data to the logicle-transformed data using
+column bind.
 
 ```{r, eval=FALSE}
 #Append clustering and dim reduction data to fluorescence data
@@ -856,8 +881,11 @@ data_all <- as.data.frame(data_all)
 write.csv(data_all, file = "cytofkit_experiment_analysis.csv")
 ```
 
-###7.e. Calculate mean logicle-transformed fluorescence intensities for each subset
-For visual analysis of each flowSOM or PhenoGraph cluster, we use the code below to calculate the logicle-transformed, mean fluorescence intensities for each flowSOM metacluster or PhenoGraph cluster.
+###7.e. Calculate mean logicle-transformed fluorescence intensities for
+each subset For visual analysis of each flowSOM or PhenoGraph cluster,
+we use the code below to calculate the logicle-transformed, mean
+fluorescence intensities for each flowSOM metacluster or PhenoGraph
+cluster.
 
 ```{r, eval=FALSE}
 #Export mean expression data for each cluster
@@ -866,7 +894,10 @@ write.csv(mean.expression.PhenoGraph, file = "cytofkit_meanexpression_analysis.c
 ```
 
 ## 7.f. Append and write to .fcs
-Finally we append the UMAP, PhenoGraph and flowSOM data to the original dataset and save this in fcs file format using cytof_addToFCS function if wish to visualise in FlowJo.
+
+Finally we append the UMAP, PhenoGraph and flowSOM data to the original
+dataset and save this in fcs file format using cytof_addToFCS function
+if wish to visualise in FlowJo.
 
 ```{r, eval=FALSE}
 #Append clustering and dim reduction data to fluorescence data
@@ -876,11 +907,11 @@ cytof_addToFCS(data_all, rawFCSdir=dir, analyzedFCSdir=dir,
 ```
 
 ## 7.g. Save R data
+
 ```{r, eval=FALSE}
 save.image(file = "CIS_analysis.RData")
 # load("CIS_analysis.RData")
 ```
-
 
 ### 7.h.) Merge Cytofkit outputs
 
@@ -929,7 +960,6 @@ write.csv(expression.data, file = "cytofkit_expression_rearrangedcol.data.csv")
 
 ```
 
-
 ##7.i.) Visualisation of the Dimension Reduced data
 
 ```{r pressure, echo=FALSE}
@@ -972,8 +1002,8 @@ p1
 dev.off()
 ```
 
-
 ## 7.j.) Multiplots
+
 ```{r}
 library(cowplot)
 library(viridis)
@@ -1019,6 +1049,7 @@ dev.off()
 ```
 
 ## 7.k.) Cluster Annotations
+
 ```{R, fig.width=8, fig.align="center", message=FALSE}
 
 library(dplyr)
@@ -1082,8 +1113,8 @@ dev.off()
 write.csv(annotate.data3, file = "annotated.data.cytofkit2.csv", row.names = FALSE)
 ```
 
-
 ## 7.l.) Subset UMAP by batch or sample type
+
 ```{r}
 library(dplyr)
 library(cowplot)
@@ -1243,6 +1274,7 @@ dev.off()
 ```
 
 ###7.m.) Export cluster data as frequencies and proportions
+
 ```{r}
 
 ##Calculate frequencies and proportions of each cluster by MS and controls:
